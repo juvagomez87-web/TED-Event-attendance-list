@@ -1,0 +1,6 @@
+{
+  "name": "TED PRIVATE",
+  "description": "Leden participatie tracker & event manager voor Land of Jails (Ultimate Cage, Turmoil, Irons Holds, Cristal Clash, Sand Sea, SVS, Supreme) met JustineValentina als admin.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
