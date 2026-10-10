@@ -9,7 +9,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -23,22 +23,30 @@ import com.example.data.local.entity.AttendanceEntity
 import com.example.data.local.entity.EventEntity
 import com.example.data.local.entity.MemberEntity
 import com.example.ui.theme.*
+import com.example.ui.viewmodel.RosterViewModel
 import com.example.util.AppStrings
 import com.example.util.Language
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun MemberDetailDialog(
     member: MemberEntity,
     events: List<EventEntity>,
     attendanceList: List<AttendanceEntity>,
     lang: Language,
+    viewModel: RosterViewModel? = null,
     onDismiss: () -> Unit
 ) {
+    var currentRank by remember(member) { mutableStateOf(member.rank) }
+    val canEdit = viewModel?.canCurrentUserEdit() ?: true
+    val availableRanks = viewModel?.AVAILABLE_RANKS ?: listOf("R4/R5", "R5", "R4", "R3", "R2", "R1")
+
     val memberAttendances = attendanceList.filter { it.memberId == member.id }
-    val attended = memberAttendances.count { it.status == "PRESENT" }
+    val attended = memberAttendances.count { it.status == "PRESENT" || it.status == "OTHER_CAGE" }
+    val otherCage = memberAttendances.count { it.status == "OTHER_CAGE" }
     val late = memberAttendances.count { it.status == "LATE" }
     val excused = memberAttendances.count { it.status == "EXCUSED" }
     val missed = memberAttendances.count { it.status == "ABSENT" }
@@ -164,7 +172,114 @@ fun MemberDetailDialog(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Rank Management Card (R1 to R5 with minimum R4 requirement)
+                Card(
+                    modifier = Modifier.fillMaxWidth().testTag("member_rank_card"),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                    shape = RoundedCornerShape(14.dp)
+                ) {
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    Icons.Default.MilitaryTech,
+                                    contentDescription = null,
+                                    tint = TedPink,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "Clan Rang (R1 t/m R5)",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = TedPink.copy(alpha = 0.2f)
+                            ) {
+                                Text(
+                                    text = currentRank,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Black,
+                                    color = TedPink,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        if (canEdit) {
+                            Text(
+                                text = "Kies nieuwe rang voor ${member.name} (Direct gesynchroniseerd met Room & Firestore):",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+
+                            Spacer(modifier = Modifier.height(6.dp))
+
+                            FlowRow(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                availableRanks.forEach { r ->
+                                    val isSelected = currentRank.equals(r, ignoreCase = true)
+                                    FilterChip(
+                                        selected = isSelected,
+                                        onClick = {
+                                            if (!isSelected) {
+                                                currentRank = r
+                                                viewModel?.updateMemberRank(member, r)
+                                            }
+                                        },
+                                        label = {
+                                            Text(
+                                                text = r,
+                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                            )
+                                        },
+                                        leadingIcon = if (isSelected) {
+                                            { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(14.dp)) }
+                                        } else null,
+                                        colors = FilterChipDefaults.filterChipColors(
+                                            selectedContainerColor = TedPink.copy(alpha = 0.2f),
+                                            selectedLabelColor = TedPink
+                                        ),
+                                        modifier = Modifier.testTag("rank_chip_$r")
+                                    )
+                                }
+                            }
+                        } else {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(MaterialTheme.colorScheme.error.copy(alpha = 0.1f))
+                                    .padding(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Default.Lock, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "Enkel leden met minimaal rang R4 kunnen rangen of leden wijzigen.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
 
                 Text(
                     text = AppStrings.get("member_history", lang),
@@ -238,6 +353,7 @@ fun MemberDetailDialog(
                                     shape = RoundedCornerShape(8.dp),
                                     color = when (status) {
                                         "PRESENT" -> StatusPresent.copy(alpha = 0.2f)
+                                        "OTHER_CAGE" -> StatusOtherCage.copy(alpha = 0.2f)
                                         "LATE" -> StatusLate.copy(alpha = 0.2f)
                                         "EXCUSED" -> StatusExcused.copy(alpha = 0.2f)
                                         else -> StatusAbsent.copy(alpha = 0.2f)
@@ -246,6 +362,7 @@ fun MemberDetailDialog(
                                     Text(
                                         text = when (status) {
                                             "PRESENT" -> AppStrings.get("attended", lang)
+                                            "OTHER_CAGE" -> AppStrings.get("status_other_cage", lang)
                                             "LATE" -> AppStrings.get("status_late", lang)
                                             "EXCUSED" -> AppStrings.get("status_excused", lang)
                                             else -> AppStrings.get("missed", lang)
@@ -254,6 +371,7 @@ fun MemberDetailDialog(
                                         fontWeight = FontWeight.Bold,
                                         color = when (status) {
                                             "PRESENT" -> StatusPresent
+                                            "OTHER_CAGE" -> StatusOtherCage
                                             "LATE" -> StatusLate
                                             "EXCUSED" -> StatusExcused
                                             else -> StatusAbsent

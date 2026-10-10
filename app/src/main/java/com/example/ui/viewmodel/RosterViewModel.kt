@@ -11,6 +11,7 @@ import com.example.data.local.entity.AuditLogEntity
 import com.example.data.local.entity.EventEntity
 import com.example.data.local.entity.MemberEntity
 import com.example.data.local.entity.UserAccountEntity
+import com.example.data.remote.FirestoreRosterService
 import com.example.data.repository.MemberAttendanceSummary
 import com.example.data.repository.RosterRepository
 import com.example.data.sync.ConflictResolutionPolicy
@@ -22,6 +23,7 @@ import com.example.util.NotificationHelper
 import com.example.util.ParsedPdfResult
 import com.example.util.PdfExporter
 import com.example.util.PdfImporter
+import com.example.util.LeaderboardScannedPlayer
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -63,6 +65,102 @@ class RosterViewModel(application: Application) : AndroidViewModel(application) 
     private val db = AppDatabase.getDatabase(application, viewModelScope)
     private val repository = RosterRepository(db)
     private val syncManager = SyncManager(application, db, viewModelScope)
+    private val firestoreService = FirestoreRosterService()
+
+    init {
+        ensureCageEventsExist()
+    }
+
+    private fun ensureCageEventsExist() {
+        viewModelScope.launch {
+            val eventsList = db.eventDao().getAllEventsList()
+            var k1 = eventsList.find {
+                it.title.contains("kooi 1", ignoreCase = true) ||
+                it.title.contains("cage 1", ignoreCase = true) ||
+                it.title.equals("Ultimate Cage", ignoreCase = true)
+            }
+            if (k1 != null && k1.title.equals("Ultimate Cage", ignoreCase = true)) {
+                k1 = k1.copy(title = "Ultieme Kooi 1", category = "Ultieme Kooi 1")
+                db.eventDao().update(k1)
+            } else if (k1 == null) {
+                val newK1 = EventEntity(
+                    title = "Ultieme Kooi 1",
+                    category = "Ultieme Kooi 1",
+                    description = "Land of Jails: Ultieme Kooi 1 arena combat & clan verdediging.",
+                    dateEpochMillis = System.currentTimeMillis(),
+                    targetGroup = "All",
+                    status = "ACTIVE",
+                    locationOrChannel = "Discord Voice Kooi 1",
+                    createdBy = "JustineValentina"
+                )
+                db.eventDao().insert(newK1)
+            }
+
+            val k2 = eventsList.find {
+                it.title.contains("kooi 2", ignoreCase = true) ||
+                it.title.contains("cage 2", ignoreCase = true)
+            }
+            if (k2 == null) {
+                val newK2 = EventEntity(
+                    title = "Ultieme Kooi 2",
+                    category = "Ultieme Kooi 2",
+                    description = "Land of Jails: Ultieme Kooi 2 arena combat & clan verdediging.",
+                    dateEpochMillis = System.currentTimeMillis(),
+                    targetGroup = "All",
+                    status = "ACTIVE",
+                    locationOrChannel = "Discord Voice Kooi 2",
+                    createdBy = "JustineValentina"
+                )
+                db.eventDao().insert(newK2)
+            }
+        }
+    }
+
+    fun findKooi1Event(): EventEntity? {
+        return allEvents.value.find {
+            it.title.contains("kooi 1", ignoreCase = true) ||
+            it.title.contains("cage 1", ignoreCase = true) ||
+            it.title.equals("Ultimate Cage", ignoreCase = true)
+        }
+    }
+
+    fun findKooi2Event(): EventEntity? {
+        return allEvents.value.find {
+            it.title.contains("kooi 2", ignoreCase = true) ||
+            it.title.contains("cage 2", ignoreCase = true)
+        }
+    }
+
+    fun isKooi1(eventId: Long): Boolean {
+        val k1 = findKooi1Event()
+        return k1?.id == eventId
+    }
+
+    fun isKooi2(eventId: Long): Boolean {
+        val k2 = findKooi2Event()
+        return k2?.id == eventId
+    }
+
+    // Available ranks in Land of Jails (R1 to R5)
+    val AVAILABLE_RANKS = listOf("R4/R5", "R5", "R4", "R3", "R2", "R1")
+
+    /**
+     * Checks if the current user has permission to edit data / change ranks (minimaal R4 vereist).
+     */
+    fun canCurrentUserEdit(): Boolean {
+        val user = _currentUser.value ?: return false
+        if (user.role.equals("ADMIN", ignoreCase = true) || user.role.equals("OFFICER", ignoreCase = true)) {
+            return true
+        }
+        val member = allMembers.value.find { it.name.equals(user.displayName, ignoreCase = true) }
+        val memberRank = member?.rank ?: user.role
+        return isRankAtLeastR4(memberRank)
+    }
+
+    fun isRankAtLeastR4(rank: String): Boolean {
+        val r = rank.trim().uppercase()
+        return r == "R5" || r == "R4/R5" || r == "R4" || r == "ADMIN"
+    }
 
     // Current active admin user (JustineValentina by default, no password/login required)
     private val _currentUser = MutableStateFlow<UserAccountEntity?>(ADMIN_JUSTINE)
@@ -111,6 +209,13 @@ class RosterViewModel(application: Application) : AndroidViewModel(application) 
 
     fun openBackupDialog() { _showBackupDialog.value = true }
     fun closeBackupDialog() { _showBackupDialog.value = false }
+
+    // Screenshot Scanner Dialog
+    private val _showScreenshotDialog = MutableStateFlow(false)
+    val showScreenshotDialog: StateFlow<Boolean> = _showScreenshotDialog.asStateFlow()
+
+    fun openScreenshotDialog() { _showScreenshotDialog.value = true }
+    fun closeScreenshotDialog() { _showScreenshotDialog.value = false }
 
     // QR Check-in Dialog
     private val _qrCheckInEvent = MutableStateFlow<EventEntity?>(null)
@@ -161,7 +266,7 @@ class RosterViewModel(application: Application) : AndroidViewModel(application) 
         val completedEventIds = events.map { it.id }.toSet()
         members.map { member ->
             val memberAttendances = attendanceList.filter { it.memberId == member.id && completedEventIds.contains(it.eventId) }
-            val attended = memberAttendances.count { it.status == "PRESENT" }
+            val attended = memberAttendances.count { it.status == "PRESENT" || it.status == "OTHER_CAGE" }
             val late = memberAttendances.count { it.status == "LATE" }
             val excused = memberAttendances.count { it.status == "EXCUSED" }
             val absent = memberAttendances.count { it.status == "ABSENT" }
@@ -324,7 +429,7 @@ class RosterViewModel(application: Application) : AndroidViewModel(application) 
         _currentUser.value = null
     }
 
-    // Attendance operations with offline queueing
+    // Attendance operations with offline queueing and Cage 1 <-> Cage 2 cross-sync
     fun setMemberAttendance(
         eventId: Long,
         memberId: Long,
@@ -349,6 +454,80 @@ class RosterViewModel(application: Application) : AndroidViewModel(application) 
             )
 
             syncManager.queueAttendanceChange(updated, author)
+
+            // Automatic cross-sync between Ultieme Kooi 1 en Kooi 2
+            val kooi1 = findKooi1Event()
+            val kooi2 = findKooi2Event()
+
+            if (kooi1 != null && kooi2 != null) {
+                if (eventId == kooi1.id) {
+                    if (status == "PRESENT") {
+                        // Mark in Kooi 2 as OTHER_CAGE
+                        val otherExisting = db.attendanceDao().getSpecific(kooi2.id, memberId)
+                        if (otherExisting == null || otherExisting.status != "PRESENT") {
+                            val otherUpdated = otherExisting?.copy(
+                                status = "OTHER_CAGE",
+                                notes = "Deelgenomen aan Ultieme Kooi 1" + if (notes.isNotBlank()) " ($notes)" else "",
+                                updatedBy = author,
+                                updatedAt = System.currentTimeMillis()
+                            ) ?: AttendanceEntity(
+                                eventId = kooi2.id,
+                                memberId = memberId,
+                                status = "OTHER_CAGE",
+                                notes = "Deelgenomen aan Ultieme Kooi 1" + if (notes.isNotBlank()) " ($notes)" else "",
+                                updatedBy = author,
+                                updatedAt = System.currentTimeMillis()
+                            )
+                            syncManager.queueAttendanceChange(otherUpdated, author)
+                        }
+                    } else if (status == "ABSENT") {
+                        // If they were marked as OTHER_CAGE in Kooi 2 because of Kooi 1, reset to ABSENT
+                        val otherExisting = db.attendanceDao().getSpecific(kooi2.id, memberId)
+                        if (otherExisting != null && otherExisting.status == "OTHER_CAGE") {
+                            val otherUpdated = otherExisting.copy(
+                                status = "ABSENT",
+                                notes = "",
+                                updatedBy = author,
+                                updatedAt = System.currentTimeMillis()
+                            )
+                            syncManager.queueAttendanceChange(otherUpdated, author)
+                        }
+                    }
+                } else if (eventId == kooi2.id) {
+                    if (status == "PRESENT") {
+                        // Mark in Kooi 1 as OTHER_CAGE
+                        val otherExisting = db.attendanceDao().getSpecific(kooi1.id, memberId)
+                        if (otherExisting == null || otherExisting.status != "PRESENT") {
+                            val otherUpdated = otherExisting?.copy(
+                                status = "OTHER_CAGE",
+                                notes = "Deelgenomen aan Ultieme Kooi 2" + if (notes.isNotBlank()) " ($notes)" else "",
+                                updatedBy = author,
+                                updatedAt = System.currentTimeMillis()
+                            ) ?: AttendanceEntity(
+                                eventId = kooi1.id,
+                                memberId = memberId,
+                                status = "OTHER_CAGE",
+                                notes = "Deelgenomen aan Ultieme Kooi 2" + if (notes.isNotBlank()) " ($notes)" else "",
+                                updatedBy = author,
+                                updatedAt = System.currentTimeMillis()
+                            )
+                            syncManager.queueAttendanceChange(otherUpdated, author)
+                        }
+                    } else if (status == "ABSENT") {
+                        // If they were marked as OTHER_CAGE in Kooi 1 because of Kooi 2, reset to ABSENT
+                        val otherExisting = db.attendanceDao().getSpecific(kooi1.id, memberId)
+                        if (otherExisting != null && otherExisting.status == "OTHER_CAGE") {
+                            val otherUpdated = otherExisting.copy(
+                                status = "ABSENT",
+                                notes = "",
+                                updatedBy = author,
+                                updatedAt = System.currentTimeMillis()
+                            )
+                            syncManager.queueAttendanceChange(otherUpdated, author)
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -356,7 +535,32 @@ class RosterViewModel(application: Application) : AndroidViewModel(application) 
         val author = _currentUser.value?.displayName ?: "JustineValentina"
         viewModelScope.launch {
             repository.batchSetAttendance(eventId, status, author)
-            _snackBarMessage.value = "Updated all to $status"
+            _snackBarMessage.value = "Alle leden bijgewerkt naar $status"
+        }
+    }
+
+    fun applyScreenshotResults(
+        targetEventId: Long,
+        scannedPlayers: List<LeaderboardScannedPlayer>
+    ) {
+        val author = _currentUser.value?.displayName ?: "JustineValentina"
+        viewModelScope.launch {
+            var appliedCount = 0
+            val targetEvent = allEvents.value.find { it.id == targetEventId }
+            val eventTitle = targetEvent?.title ?: "Evenement"
+
+            scannedPlayers.filter { it.isSelected && it.matchedMemberId != null }.forEach { player ->
+                val memberId = player.matchedMemberId ?: return@forEach
+                val scoreNote = "Doelpunten: ${player.score} (#${player.rank})"
+                setMemberAttendance(targetEventId, memberId, "PRESENT", scoreNote)
+                appliedCount++
+            }
+
+            val syncMsg = if (isKooi1(targetEventId)) " • Kooi 2 automatisch bijgewerkt!"
+                          else if (isKooi2(targetEventId)) " • Kooi 1 automatisch bijgewerkt!"
+                          else ""
+            _snackBarMessage.value = "✅ $appliedCount leden als AANWEZIG geregistreerd in $eventTitle$syncMsg"
+            _showScreenshotDialog.value = false
         }
     }
 
@@ -393,7 +597,60 @@ class RosterViewModel(application: Application) : AndroidViewModel(application) 
         val author = _currentUser.value?.displayName ?: "JustineValentina"
         viewModelScope.launch {
             repository.saveMember(member, author)
-            _snackBarMessage.value = "Member updated."
+            firestoreService.syncMemberToCloud(member, author)
+            _snackBarMessage.value = "Lid '${member.name}' opgeslagen & gesynchroniseerd."
+        }
+    }
+
+    /**
+     * Updates a member's rank (R1 to R5) with mandatory check: minimum R4 required to change.
+     */
+    fun updateMemberRank(member: MemberEntity, newRank: String, onComplete: ((Boolean, String) -> Unit)? = null) {
+        if (!canCurrentUserEdit()) {
+            val msg = "Geen bevoegdheid: je moet minimaal rang R4 hebben om gegevens of rangen te veranderen."
+            _snackBarMessage.value = msg
+            onComplete?.invoke(false, msg)
+            return
+        }
+
+        val author = _currentUser.value?.displayName ?: "JustineValentina"
+        val oldRank = member.rank
+        val updatedMember = member.copy(rank = newRank)
+
+        viewModelScope.launch {
+            // 1. Update local Room database
+            repository.saveMember(updatedMember, author)
+
+            // 2. Insert audit log
+            db.auditLogDao().insert(
+                AuditLogEntity(
+                    timestamp = System.currentTimeMillis(),
+                    authorName = author,
+                    actionType = "RANK_CHANGE",
+                    entityTarget = member.name,
+                    details = "Rang gewijzigd van '$oldRank' naar '$newRank' door $author (Minimaal R4 vereiste voldaan)."
+                )
+            )
+
+            // 3. Sync member profile and rank to Firebase Firestore
+            firestoreService.updateMemberRank(member.name, newRank, author)
+
+            val msg = "Rang van '${member.name}' succesvol veranderd naar $newRank!"
+            _snackBarMessage.value = msg
+            onComplete?.invoke(true, msg)
+        }
+    }
+
+    fun syncAllMembersToFirestore() {
+        val author = _currentUser.value?.displayName ?: "JustineValentina"
+        val members = allMembers.value
+        viewModelScope.launch {
+            val res = firestoreService.syncAllMembersToCloud(members, author)
+            if (res.isSuccess) {
+                _snackBarMessage.value = "${res.getOrNull()} ledenprofielen en rangen gesynchroniseerd met Firebase Firestore!"
+            } else {
+                _snackBarMessage.value = "Firestore sync: ${res.exceptionOrNull()?.message}"
+            }
         }
     }
 

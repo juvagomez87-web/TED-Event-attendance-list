@@ -51,7 +51,7 @@ fun DashboardScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
+            .background(MaterialTheme.colorScheme.background.copy(alpha = 0.75f))
             .padding(16.dp)
     ) {
         // Top Action Bar: Export PDF & Import PDF
@@ -265,7 +265,7 @@ fun DashboardScreen(
 
                         events.forEach { ev ->
                             val evAttendances = allAttendance.filter { it.eventId == ev.id }
-                            val pres = evAttendances.count { it.status == "PRESENT" }
+                            val pres = evAttendances.count { it.status == "PRESENT" || it.status == "OTHER_CAGE" }
                             val late = evAttendances.count { it.status == "LATE" }
                             val total = maxOf(members.size, 1)
                             val rate = (((pres + (late * 0.75f)) / total) * 100).toInt()

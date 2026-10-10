@@ -53,13 +53,25 @@ fun AuthScreen(
     var infoMessage by remember { mutableStateOf<String?>(null) }
 
     Box(
-        modifier = modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .padding(24.dp),
-        contentAlignment = Alignment.Center
+        modifier = modifier.fillMaxSize()
     ) {
-        Card(
+        // TED Clan Custom Background
+        Image(
+            painter = painterResource(id = R.drawable.ted_app_background),
+            contentDescription = null,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop,
+            alpha = 0.45f
+        )
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background.copy(alpha = 0.70f))
+                .padding(24.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Card(
             modifier = Modifier
                 .fillMaxWidth()
                 .widthIn(max = 460.dp),
@@ -405,4 +417,5 @@ fun AuthScreen(
             }
         }
     }
+}
 }

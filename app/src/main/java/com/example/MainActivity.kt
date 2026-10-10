@@ -50,6 +50,7 @@ class MainActivity : ComponentActivity() {
                 val lang by viewModel.currentLanguage.collectAsState()
                 val currentTab by viewModel.currentTab.collectAsState()
                 val showImportDialog by viewModel.showImportDialog.collectAsState()
+                val showScreenshotDialog by viewModel.showScreenshotDialog.collectAsState()
                 val showSyncDialog by viewModel.showSyncDialog.collectAsState()
                 val showBackupDialog by viewModel.showBackupDialog.collectAsState()
                 val qrCheckInEvent by viewModel.qrCheckInEvent.collectAsState()
@@ -294,6 +295,15 @@ class MainActivity : ComponentActivity() {
                                 .fillMaxSize()
                                 .padding(innerPadding)
                         ) {
+                            // Bloodthirsty Ted custom background
+                            Image(
+                                painter = painterResource(id = R.drawable.ted_app_background),
+                                contentDescription = null,
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop,
+                                alpha = 0.48f
+                            )
+
                             when (currentTab) {
                                 "EVENTS" -> EventsScreen(viewModel = viewModel)
                                 "ROSTER" -> MembersScreen(viewModel = viewModel)
@@ -336,6 +346,14 @@ class MainActivity : ComponentActivity() {
                         BackupDialog(
                             viewModel = viewModel,
                             onDismiss = { viewModel.closeBackupDialog() }
+                        )
+                    }
+
+                    // Screenshot Scanner Dialog modal
+                    if (showScreenshotDialog) {
+                        ScreenshotScannerDialog(
+                            viewModel = viewModel,
+                            onDismiss = { viewModel.closeScreenshotDialog() }
                         )
                     }
                 }

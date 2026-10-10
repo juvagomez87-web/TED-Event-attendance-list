@@ -141,6 +141,31 @@ object AppStrings {
             Language.NL to "Afgemeld",
             Language.ES to "Excusado"
         ),
+        "status_other_cage" to mapOf(
+            Language.EN to "Other Cage",
+            Language.NL to "Andere Kooi",
+            Language.ES to "Otra Jaula"
+        ),
+        "in_kooi_1" to mapOf(
+            Language.EN to "In Cage 1",
+            Language.NL to "In Kooi 1",
+            Language.ES to "En Jaula 1"
+        ),
+        "in_kooi_2" to mapOf(
+            Language.EN to "In Cage 2",
+            Language.NL to "In Kooi 2",
+            Language.ES to "En Jaula 2"
+        ),
+        "scan_screenshot" to mapOf(
+            Language.EN to "Scan Screenshot",
+            Language.NL to "Screenshot Scannen",
+            Language.ES to "Escanear Captura"
+        ),
+        "screenshot_interpreter" to mapOf(
+            Language.EN to "Screenshot Interpreter",
+            Language.NL to "Screenshot Interpreter",
+            Language.ES to "Intérprete de Captura"
+        ),
 
         // Participation & Stats
         "participation_rate" to mapOf(

@@ -158,6 +158,7 @@ abstract class AppDatabase : RoomDatabase() {
             Pair("Luuuuuavks", "R2"),
             Pair("Irgat", "R2"),
             Pair("FIRE 8", "R2"),
+            Pair("Warden NY Falcon", "R2"),
             Pair("warden919065361", "R2")
         )
 
@@ -263,27 +264,27 @@ abstract class AppDatabase : RoomDatabase() {
             )
             userAccountDao.insertAll(accounts)
 
-            // 3. Initial Land of Jails Events
+            // 3. Initial Land of Jails Events (Altijd Ultieme Kooi 1 en Kooi 2)
             val event1 = EventEntity(
                 id = 1,
-                title = "Ultimate Cage",
-                category = "Ultimate Cage",
-                description = "Land of Jails: Ultimate Cage arena combat & clan defense.",
-                dateEpochMillis = now - (oneDay * 3),
+                title = "Ultieme Kooi 1",
+                category = "Ultieme Kooi 1",
+                description = "Land of Jails: Ultieme Kooi 1 arena combat & clan verdediging.",
+                dateEpochMillis = now,
                 targetGroup = "All",
-                status = "COMPLETED",
-                locationOrChannel = "Discord Voice HQ",
+                status = "ACTIVE",
+                locationOrChannel = "Discord Voice Kooi 1",
                 createdBy = "JustineValentina"
             )
             val event2 = EventEntity(
                 id = 2,
-                title = "Turmoil",
-                category = "Turmoil",
-                description = "Land of Jails: Turmoil alliance territory contest & strategic push.",
-                dateEpochMillis = now - (oneDay * 2),
+                title = "Ultieme Kooi 2",
+                category = "Ultieme Kooi 2",
+                description = "Land of Jails: Ultieme Kooi 2 arena combat & clan verdediging.",
+                dateEpochMillis = now,
                 targetGroup = "All",
-                status = "COMPLETED",
-                locationOrChannel = "Discord War Room",
+                status = "ACTIVE",
+                locationOrChannel = "Discord Voice Kooi 2",
                 createdBy = "JustineValentina"
             )
             val event3 = EventEntity(

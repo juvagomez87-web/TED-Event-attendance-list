@@ -13,6 +13,9 @@ interface EventDao {
     @Query("SELECT * FROM events ORDER BY dateEpochMillis DESC")
     fun getAllEvents(): Flow<List<EventEntity>>
 
+    @Query("SELECT * FROM events ORDER BY dateEpochMillis DESC")
+    suspend fun getAllEventsList(): List<EventEntity>
+
     @Query("SELECT * FROM events WHERE id = :id LIMIT 1")
     suspend fun getEventById(id: Long): EventEntity?
 

@@ -63,7 +63,7 @@ fun MembersScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
+            .background(MaterialTheme.colorScheme.background.copy(alpha = 0.75f))
             .padding(16.dp)
     ) {
         // Top Header & Add Member
@@ -276,6 +276,7 @@ fun MembersScreen(
             events = events,
             attendanceList = allAttendance,
             lang = lang,
+            viewModel = viewModel,
             onDismiss = { detailedMember = null }
         )
     }

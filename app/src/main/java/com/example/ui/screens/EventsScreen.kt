@@ -53,12 +53,28 @@ fun EventsScreen(
     var detailedMember by remember { mutableStateOf<MemberEntity?>(null) }
     var showStatusFilterDropdown by remember { mutableStateOf(false) }
 
-    val currentEvent = events.find { it.id == selectedEventId } ?: events.firstOrNull()
+    // Kooi 1 and Kooi 2 event lookups
+    val kooi1Event = events.find { it.title.contains("kooi 1", ignoreCase = true) || it.title.contains("cage 1", ignoreCase = true) }
+    val kooi2Event = events.find { it.title.contains("kooi 2", ignoreCase = true) || it.title.contains("cage 2", ignoreCase = true) }
+
+    // Sorted so Ultieme Kooi 1 and Kooi 2 are ALWAYS shown first
+    val sortedEvents = remember(events) {
+        events.sortedWith(compareBy<EventEntity> { ev ->
+            when {
+                ev.title.contains("kooi 1", ignoreCase = true) || ev.title.contains("cage 1", ignoreCase = true) -> 1
+                ev.title.contains("kooi 2", ignoreCase = true) || ev.title.contains("cage 2", ignoreCase = true) -> 2
+                else -> 3
+            }
+        }.thenByDescending { it.dateEpochMillis })
+    }
+
+    val currentEvent = sortedEvents.find { it.id == selectedEventId } ?: sortedEvents.firstOrNull()
     val eventAttendances = if (currentEvent != null) {
         allAttendance.filter { it.eventId == currentEvent.id }
     } else emptyList()
 
     val presentCount = eventAttendances.count { it.status == "PRESENT" }
+    val otherCageCount = eventAttendances.count { it.status == "OTHER_CAGE" }
     val absentCount = eventAttendances.count { it.status == "ABSENT" }
     val lateCount = eventAttendances.count { it.status == "LATE" }
     val excusedCount = eventAttendances.count { it.status == "EXCUSED" }
@@ -86,7 +102,7 @@ fun EventsScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
+            .background(MaterialTheme.colorScheme.background.copy(alpha = 0.75f))
     ) {
         // Event Tabs / Carousel (Each event has a separate section)
         Surface(
@@ -106,7 +122,13 @@ fun EventsScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
 
-                    Row {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(
+                            onClick = { viewModel.openScreenshotDialog() },
+                            modifier = Modifier.size(32.dp).testTag("event_scan_screenshot_icon")
+                        ) {
+                            Icon(Icons.Default.DocumentScanner, contentDescription = "Screenshot Scannen", tint = TedPink, modifier = Modifier.size(20.dp))
+                        }
                         IconButton(
                             onClick = { viewModel.openImportDialog() },
                             modifier = Modifier.size(32.dp).testTag("event_import_pdf_icon")
@@ -122,11 +144,80 @@ fun EventsScreen(
                     }
                 }
 
+                // Quick Cage 1 <-> Cage 2 Switcher Banner
+                if (kooi1Event != null && kooi2Event != null) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        val isK1 = currentEvent?.id == kooi1Event.id
+                        val isK2 = currentEvent?.id == kooi2Event.id
+
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = if (isK1) TedPink else MaterialTheme.colorScheme.surfaceVariant,
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable { viewModel.selectEvent(kooi1Event.id) }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center
+                            ) {
+                                Icon(
+                                    Icons.Default.Fort,
+                                    contentDescription = null,
+                                    tint = if (isK1) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "Ultieme Kooi 1",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = if (isK1) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (isK1) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = if (isK2) StatusOtherCage else MaterialTheme.colorScheme.surfaceVariant,
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable { viewModel.selectEvent(kooi2Event.id) }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center
+                            ) {
+                                Icon(
+                                    Icons.Default.Fort,
+                                    contentDescription = null,
+                                    tint = if (isK2) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "Ultieme Kooi 2",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = if (isK2) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (isK2) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
+
                 LazyRow(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
                 ) {
-                    items(events) { ev ->
+                    items(sortedEvents) { ev ->
                         val isSelected = ev.id == currentEvent?.id
                         FilterChip(
                             selected = isSelected,
@@ -238,9 +329,10 @@ fun EventsScreen(
                     // Colored Attendance Progress Breakdown Bar (matches Screenshot 1)
                     val totalTracked = maxOf(totalEventMembers, 1)
                     val presentFraction = presentCount.toFloat() / totalTracked
+                    val otherCageFraction = otherCageCount.toFloat() / totalTracked
                     val lateFraction = lateCount.toFloat() / totalTracked
                     val excusedFraction = excusedCount.toFloat() / totalTracked
-                    val absentFraction = (totalTracked - presentCount - lateCount - excusedCount).toFloat() / totalTracked
+                    val absentFraction = (totalTracked - presentCount - otherCageCount - lateCount - excusedCount).toFloat() / totalTracked
 
                     Row(
                         modifier = Modifier
@@ -250,6 +342,9 @@ fun EventsScreen(
                     ) {
                         if (presentFraction > 0f) {
                             Box(modifier = Modifier.weight(maxOf(presentFraction, 0.01f)).fillMaxHeight().background(StatusPresent))
+                        }
+                        if (otherCageFraction > 0f) {
+                            Box(modifier = Modifier.weight(maxOf(otherCageFraction, 0.01f)).fillMaxHeight().background(StatusOtherCage))
                         }
                         if (lateFraction > 0f) {
                             Box(modifier = Modifier.weight(maxOf(lateFraction, 0.01f)).fillMaxHeight().background(StatusLate))
@@ -270,8 +365,10 @@ fun EventsScreen(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(text = "✔ $presentCount ${AppStrings.get("status_present", lang)}", style = MaterialTheme.typography.labelSmall, color = StatusPresent, fontWeight = FontWeight.Bold)
+                        if (otherCageCount > 0 || currentEvent.title.contains("kooi", ignoreCase = true)) {
+                            Text(text = "⚡ $otherCageCount ${AppStrings.get("status_other_cage", lang)}", style = MaterialTheme.typography.labelSmall, color = StatusOtherCage, fontWeight = FontWeight.Bold)
+                        }
                         Text(text = "⏱ $lateCount ${AppStrings.get("status_late", lang)}", style = MaterialTheme.typography.labelSmall, color = StatusLate, fontWeight = FontWeight.Bold)
-                        Text(text = "✉ $excusedCount ${AppStrings.get("status_excused", lang)}", style = MaterialTheme.typography.labelSmall, color = StatusExcused, fontWeight = FontWeight.Bold)
                         Text(text = "✖ $absentCount ${AppStrings.get("status_absent", lang)}", style = MaterialTheme.typography.labelSmall, color = StatusAbsent, fontWeight = FontWeight.Bold)
                     }
                 }
@@ -339,6 +436,10 @@ fun EventsScreen(
                             onClick = { viewModel.setStatusFilter("LATE"); showStatusFilterDropdown = false }
                         )
                         DropdownMenuItem(
+                            text = { Text(AppStrings.get("status_other_cage", lang)) },
+                            onClick = { viewModel.setStatusFilter("OTHER_CAGE"); showStatusFilterDropdown = false }
+                        )
+                        DropdownMenuItem(
                             text = { Text(AppStrings.get("status_excused", lang)) },
                             onClick = { viewModel.setStatusFilter("EXCUSED"); showStatusFilterDropdown = false }
                         )
@@ -346,11 +447,89 @@ fun EventsScreen(
                 }
             }
 
-            // Quick Actions: All Present / All Absent / Reset (matches Screenshot 1)
+            // Prominent Hero Action: Scan Screenshots & Koppel aan Event
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 6.dp)
+                    .clickable { viewModel.openScreenshotDialog() }
+                    .testTag("quick_scan_screenshot_hero_card"),
+                shape = RoundedCornerShape(14.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = TedPink.copy(alpha = 0.22f)
+                ),
+                border = androidx.compose.foundation.BorderStroke(1.5.dp, TedPink.copy(alpha = 0.6f))
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(44.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(TedPink),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Default.DocumentScanner,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(26.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = "Screenshots Opladen & Scannen",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = Color.White
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = TedPink.copy(alpha = 0.35f)
+                                ) {
+                                    Text(
+                                        text = "AI VISION",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = TedPink,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                    )
+                                }
+                            }
+                            Text(
+                                text = "Koppel uitslagen aan ${currentEvent.title} (of kies ander event)",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    Icon(
+                        Icons.Default.ArrowForwardIos,
+                        contentDescription = null,
+                        tint = TedPink,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+
+            // Secondary Quick Actions: All Present / All Absent / Reset
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 6.dp),
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Button(
@@ -461,6 +640,7 @@ fun EventsScreen(
             events = events,
             attendanceList = allAttendance,
             lang = lang,
+            viewModel = viewModel,
             onDismiss = { detailedMember = null }
         )
     }
@@ -550,6 +730,29 @@ fun MemberChecklistRow(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
+
+                    // Special participation badge if member is in other cage
+                    if (status == "OTHER_CAGE") {
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = StatusOtherCage.copy(alpha = 0.18f),
+                            modifier = Modifier.padding(top = 3.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Default.Bolt, contentDescription = null, tint = StatusOtherCage, modifier = Modifier.size(12.dp))
+                                Spacer(modifier = Modifier.width(3.dp))
+                                Text(
+                                    text = if (note.isNotBlank()) note else "Deelgenomen aan andere kooi",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = StatusOtherCage,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
                 }
             }
 
@@ -571,6 +774,23 @@ fun MemberChecklistRow(
                         imageVector = Icons.Default.Check,
                         contentDescription = "Present",
                         tint = if (status == "PRESENT") Color.White else StatusPresent,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+
+                // Other Cage (Kooi 1 <-> Kooi 2 exchange)
+                IconButton(
+                    onClick = { onSetStatus("OTHER_CAGE") },
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(if (status == "OTHER_CAGE") StatusOtherCage else StatusOtherCage.copy(alpha = 0.12f))
+                        .testTag("btn_other_cage_${member.id}")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.SwapHoriz,
+                        contentDescription = "Andere Kooi",
+                        tint = if (status == "OTHER_CAGE") Color.White else StatusOtherCage,
                         modifier = Modifier.size(18.dp)
                     )
                 }

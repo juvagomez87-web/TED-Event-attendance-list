@@ -15,6 +15,7 @@ val StatusPresent = Color(0xFF10B981) // Emerald Green
 val StatusAbsent = Color(0xFFEF4444)  // Rose Red
 val StatusLate = Color(0xFFF59E0B)    // Amber Orange
 val StatusExcused = Color(0xFF8B5CF6) // Purple
+val StatusOtherCage = Color(0xFF6366F1) // Indigo / Blue-Purple (Andere Kooi)
 
 val TextPrimary = Color(0xFFF8FAFC)
 val TextSecondary = Color(0xFF94A3B8)

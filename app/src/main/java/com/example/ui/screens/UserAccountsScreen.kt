@@ -52,7 +52,7 @@ fun UserAccountsScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
+            .background(MaterialTheme.colorScheme.background.copy(alpha = 0.75f))
             .padding(16.dp)
     ) {
         // Header

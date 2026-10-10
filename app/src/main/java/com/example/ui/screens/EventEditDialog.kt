@@ -22,13 +22,13 @@ fun EventEditDialog(
     onSave: (EventEntity) -> Unit
 ) {
     var title by remember { mutableStateOf(initialEvent?.title ?: "") }
-    var category by remember { mutableStateOf(initialEvent?.category ?: "Ultimate Cage") }
+    var category by remember { mutableStateOf(initialEvent?.category ?: "Ultieme Kooi 1") }
     var description by remember { mutableStateOf(initialEvent?.description ?: "") }
     var location by remember { mutableStateOf(initialEvent?.locationOrChannel ?: "Discord Voice HQ") }
     var status by remember { mutableStateOf(initialEvent?.status ?: "ACTIVE") }
     var targetGroup by remember { mutableStateOf(initialEvent?.targetGroup ?: "All") }
 
-    val categories = listOf("Ultimate Cage", "Turmoil", "Irons Holds", "Cristal Clash", "Sand Sea", "SVS", "Supreme")
+    val categories = listOf("Ultieme Kooi 1", "Ultieme Kooi 2", "Turmoil", "Irons Holds", "Cristal Clash", "Sand Sea", "SVS", "Supreme")
     val statuses = listOf("ACTIVE", "COMPLETED", "UPCOMING")
 
     AlertDialog(
