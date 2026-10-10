@@ -217,6 +217,13 @@ class RosterViewModel(application: Application) : AndroidViewModel(application) 
     fun openScreenshotDialog() { _showScreenshotDialog.value = true }
     fun closeScreenshotDialog() { _showScreenshotDialog.value = false }
 
+    // Discord Assistant Dialog
+    private val _showDiscordDialog = MutableStateFlow(false)
+    val showDiscordDialog: StateFlow<Boolean> = _showDiscordDialog.asStateFlow()
+
+    fun openDiscordDialog() { _showDiscordDialog.value = true }
+    fun closeDiscordDialog() { _showDiscordDialog.value = false }
+
     // QR Check-in Dialog
     private val _qrCheckInEvent = MutableStateFlow<EventEntity?>(null)
     val qrCheckInEvent: StateFlow<EventEntity?> = _qrCheckInEvent.asStateFlow()

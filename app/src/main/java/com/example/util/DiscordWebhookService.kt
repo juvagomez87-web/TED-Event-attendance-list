@@ -146,4 +146,141 @@ object DiscordWebhookService {
             Result.failure(e)
         }
     }
+
+    suspend fun sendLeaderboardSummary(
+        webhookUrl: String,
+        eventTitle: String,
+        players: List<LeaderboardScannedPlayer>
+    ): Result<String> = withContext(Dispatchers.IO) {
+        if (webhookUrl.isBlank() || !webhookUrl.startsWith("http")) {
+            return@withContext Result.failure(Exception("Geen geldige Discord Webhook URL ingesteld. Stel deze eerst in bij Discord Instellingen."))
+        }
+
+        val selectedPlayers = players.filter { it.isSelected }
+        if (selectedPlayers.isEmpty()) {
+            return@withContext Result.failure(Exception("Geen geselecteerde spelers om te versturen."))
+        }
+
+        val dateFormat = SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault())
+        val dateString = dateFormat.format(Date())
+
+        val rootJson = JSONObject().apply {
+            put("username", "TED PRIVATE Bot")
+            put("avatar_url", "https://raw.githubusercontent.com/aistudio/assets/main/ted_icon.png")
+            put("content", "📢 **Nieuwe uitslag geregistreerd voor #leaders-chat:** $eventTitle")
+
+            val embed = JSONObject().apply {
+                put("title", "🏆 [TED PRIVATE] $eventTitle - Uitslag")
+                put("description", "Uitslag en score-overzicht geregistreerd op **$dateString**.\nTotaal geregistreerde spelers: **${selectedPlayers.size}**")
+                put("color", 0xE91E63) // TED Pink
+
+                val fields = JSONArray().apply {
+                    // Ranking leaderboard field
+                    val rankingLines = selectedPlayers.take(12).map { p ->
+                        val medal = when (p.rank) {
+                            1 -> "🥇"
+                            2 -> "🥈"
+                            3 -> "🥉"
+                            else -> "🔹 #${p.rank}"
+                        }
+                        val clanRank = if (!p.matchedMemberRank.isNullOrBlank()) " (${p.matchedMemberRank})" else ""
+                        "$medal **${p.cleanName}**$clanRank — `${p.score} doelpunten`"
+                    }
+
+                    put(JSONObject().apply {
+                        put("name", "⚔️ Leaderboard Top Deelnemers")
+                        put("value", rankingLines.joinToString("\n"))
+                        put("inline", false)
+                    })
+
+                    // Matched roster count
+                    val matchedCount = selectedPlayers.count { it.matchedMemberId != null }
+                    put(JSONObject().apply {
+                        put("name", "📋 Clan Status")
+                        put("value", "✓ **$matchedCount/${selectedPlayers.size}** spelers gekoppeld aan TED ledenlijst.")
+                        put("inline", true)
+                    })
+                }
+                put("fields", fields)
+
+                put("footer", JSONObject().apply {
+                    put("text", "TED PRIVATE • Verzonden naar #leaders-chat • BLOOD THIRSTY TED ALLIANCE")
+                })
+            }
+
+            put("embeds", JSONArray().put(embed))
+        }
+
+        try {
+            val body = rootJson.toString().toRequestBody(JSON_MEDIA_TYPE)
+            val request = Request.Builder()
+                .url(webhookUrl)
+                .post(body)
+                .build()
+
+            client.newCall(request).execute().use { response ->
+                if (response.isSuccessful || response.code in 200..204) {
+                    Result.success("Uitslag succesvol geplaatst in #leaders-chat!")
+                } else {
+                    Result.failure(Exception("Discord fout HTTP ${response.code}: ${response.message}"))
+                }
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun sendTestMessage(
+        webhookUrl: String,
+        channelName: String = "#leaders-chat"
+    ): Result<String> = withContext(Dispatchers.IO) {
+        if (webhookUrl.isBlank() || !webhookUrl.startsWith("http")) {
+            return@withContext Result.failure(Exception("Voer eerst een geldige Discord Webhook URL in."))
+        }
+
+        val rootJson = JSONObject().apply {
+            put("username", "TED PRIVATE Bot")
+            put("content", "✅ **Verbinding geslaagd!** TED PRIVATE is nu gekoppeld aan **$channelName**.")
+
+            val embed = JSONObject().apply {
+                put("title", "🛡️ TED PRIVATE Webhook Actief")
+                put("description", "Vanaf nu kunnen uitslagen van Ultieme Kooi 1 en Kooi 2 direct vanuit de app met 1 druk op de knop naar dit kanaal gestuurd worden.")
+                put("color", 0x22C55E) // Success Green
+                put("fields", JSONArray().apply {
+                    put(JSONObject().apply {
+                        put("name", "Kanaal", )
+                        put("value", channelName)
+                        put("inline", true)
+                    })
+                    put(JSONObject().apply {
+                        put("name", "Status")
+                        put("value", "Online & Klaar voor gebruik")
+                        put("inline", true)
+                    })
+                })
+                put("footer", JSONObject().apply {
+                    put("text", "BLOOD THIRSTY TED ALLIANCE • TED PRIVATE Systeem")
+                })
+            }
+            put("embeds", JSONArray().put(embed))
+        }
+
+        try {
+            val body = rootJson.toString().toRequestBody(JSON_MEDIA_TYPE)
+            val request = Request.Builder()
+                .url(webhookUrl)
+                .post(body)
+                .build()
+
+            client.newCall(request).execute().use { response ->
+                if (response.isSuccessful || response.code in 200..204) {
+                    Result.success("Testbericht succesvol verstuurd naar $channelName!")
+                } else {
+                    Result.failure(Exception("Discord fout HTTP ${response.code}: ${response.message}"))
+                }
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
 }

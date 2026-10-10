@@ -51,6 +51,7 @@ class MainActivity : ComponentActivity() {
                 val currentTab by viewModel.currentTab.collectAsState()
                 val showImportDialog by viewModel.showImportDialog.collectAsState()
                 val showScreenshotDialog by viewModel.showScreenshotDialog.collectAsState()
+                val showDiscordDialog by viewModel.showDiscordDialog.collectAsState()
                 val showSyncDialog by viewModel.showSyncDialog.collectAsState()
                 val showBackupDialog by viewModel.showBackupDialog.collectAsState()
                 val qrCheckInEvent by viewModel.qrCheckInEvent.collectAsState()
@@ -354,6 +355,18 @@ class MainActivity : ComponentActivity() {
                         ScreenshotScannerDialog(
                             viewModel = viewModel,
                             onDismiss = { viewModel.closeScreenshotDialog() }
+                        )
+                    }
+
+                    // Discord Assistant Dialog modal
+                    if (showDiscordDialog) {
+                        val allEvents by viewModel.allEvents.collectAsState()
+                        val selectedEventId by viewModel.selectedEventId.collectAsState()
+                        val selectedEvent = allEvents.find { it.id == selectedEventId } ?: allEvents.firstOrNull()
+                        DiscordAssistantDialog(
+                            viewModel = viewModel,
+                            selectedEvent = selectedEvent,
+                            onDismiss = { viewModel.closeDiscordDialog() }
                         )
                     }
                 }

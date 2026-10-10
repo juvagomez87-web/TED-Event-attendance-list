@@ -124,6 +124,12 @@ fun EventsScreen(
 
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         IconButton(
+                            onClick = { viewModel.openDiscordDialog() },
+                            modifier = Modifier.size(32.dp).testTag("event_discord_icon")
+                        ) {
+                            Icon(Icons.Default.Chat, contentDescription = "Discord #leaders-chat", tint = Color(0xFF5865F2), modifier = Modifier.size(19.dp))
+                        }
+                        IconButton(
                             onClick = { viewModel.openScreenshotDialog() },
                             modifier = Modifier.size(32.dp).testTag("event_scan_screenshot_icon")
                         ) {
@@ -521,6 +527,65 @@ fun EventsScreen(
                         contentDescription = null,
                         tint = TedPink,
                         modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+
+            // Quick Discord #leaders-chat Action Card
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 3.dp)
+                    .clickable { viewModel.openDiscordDialog() }
+                    .testTag("quick_discord_hero_card"),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = Color(0xFF5865F2).copy(alpha = 0.16f)
+                ),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF5865F2).copy(alpha = 0.5f))
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 14.dp, vertical = 9.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = Color(0xFF5865F2)
+                        ) {
+                            Icon(
+                                Icons.Default.Chat,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.padding(6.dp).size(18.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column {
+                            Text(
+                                text = "Deel met Discord #leaders-chat",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                            Text(
+                                text = "Stuur uitslag van ${currentEvent.title} direct naar Discord",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                    Icon(
+                        Icons.Default.ArrowForwardIos,
+                        contentDescription = null,
+                        tint = Color(0xFF5865F2),
+                        modifier = Modifier.size(14.dp)
                     )
                 }
             }

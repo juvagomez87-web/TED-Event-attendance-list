@@ -31,9 +31,12 @@ import androidx.compose.ui.window.DialogProperties
 import com.example.data.local.entity.EventEntity
 import com.example.ui.theme.*
 import com.example.ui.viewmodel.RosterViewModel
+import com.example.util.DiscordShareHelper
 import com.example.util.GeminiVisionService
 import com.example.util.LeaderboardScannedPlayer
 import com.example.util.PresetLeaderboardSamples
+import coil.compose.AsyncImage
+import androidx.compose.ui.layout.ContentScale
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -66,6 +69,29 @@ fun ScreenshotScannerDialog(
     var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
     var showEventDropdown by remember { mutableStateOf(false) }
 
+    // Android GetContent (Directe bestandsverkenner & galerij van het toestel)
+    val getContentLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            selectedImageUri = uri
+            isProcessing = true
+            statusMessage = "Screenshot analyseren met AI vision..."
+            coroutineScope.launch {
+                val result = GeminiVisionService.analyzeScreenshot(context, uri, members)
+                isProcessing = false
+                if (result.isSuccess) {
+                    val list = result.getOrThrow()
+                    scannedPlayers = list
+                    statusMessage = "✓ ${list.size} spelers herkend uit uw eigen bestand!"
+                } else {
+                    scannedPlayers = GeminiVisionService.matchWithRoster(PresetLeaderboardSamples.KOOI_1, members)
+                    statusMessage = "Screenshot geladen (${result.exceptionOrNull()?.message ?: "AI offline"}). Kooi 1 gegevens getoond:"
+                }
+            }
+        }
+    }
+
     // Android Photo Picker
     val photoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
@@ -82,9 +108,8 @@ fun ScreenshotScannerDialog(
                     scannedPlayers = list
                     statusMessage = "✓ ${list.size} spelers herkend uit uw eigen screenshot!"
                 } else {
-                    // Fallback to sample 2 with informative note
-                    scannedPlayers = GeminiVisionService.matchWithRoster(PresetLeaderboardSamples.SAMPLE_2, members)
-                    statusMessage = "Screenshot geladen (${result.exceptionOrNull()?.message ?: "AI offline"}). Voorbeeldgegevens van kooi getoond:"
+                    scannedPlayers = GeminiVisionService.matchWithRoster(PresetLeaderboardSamples.KOOI_1, members)
+                    statusMessage = "Screenshot geladen (${result.exceptionOrNull()?.message ?: "AI offline"}). Kooi 1 gegevens getoond:"
                 }
             }
         }
@@ -323,19 +348,32 @@ fun ScreenshotScannerDialog(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    // Pick from phone gallery
+                    // Pick from phone files / device storage (GetContent)
                     FilledTonalButton(
+                        onClick = {
+                            getContentLauncher.launch("image/*")
+                        },
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.weight(1.3f).height(44.dp).testTag("pick_custom_file_btn")
+                    ) {
+                        Icon(Icons.Default.FolderOpen, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Bestanden...", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                    }
+
+                    // Pick from phone gallery (Photo Picker)
+                    OutlinedButton(
                         onClick = {
                             photoPickerLauncher.launch(
                                 PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
                             )
                         },
                         shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier.weight(1.3f).height(44.dp).testTag("pick_custom_screenshot_btn")
+                        modifier = Modifier.weight(1.1f).height(44.dp).testTag("pick_custom_screenshot_btn")
                     ) {
                         Icon(Icons.Default.PhotoLibrary, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Galerij...", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Galerij", style = MaterialTheme.typography.labelSmall)
                     }
 
                     // Kooi 1 Screenshot (User's uploaded screenshot: willow t/m MissQueenJuva)
@@ -369,6 +407,44 @@ fun ScreenshotScannerDialog(
                         modifier = Modifier.weight(1.2f).height(44.dp).testTag("test_sample_2_btn")
                     ) {
                         Text("Kooi 2 (Minou)", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                    }
+                }
+
+                // Uploaded phone image preview
+                if (selectedImageUri != null) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            AsyncImage(
+                                model = selectedImageUri,
+                                contentDescription = "Gekozen screenshot",
+                                modifier = Modifier
+                                    .size(46.dp)
+                                    .clip(RoundedCornerShape(8.dp)),
+                                contentScale = ContentScale.Crop
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "✓ Bestand vanaf telefoon ingeladen",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = StatusPresent
+                                )
+                                Text(
+                                    text = "Afbeelding actief. Bevestig de spelers hieronder of pas de doelpunten aan.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
                     }
                 }
 
@@ -566,6 +642,49 @@ fun ScreenshotScannerDialog(
                 // Footer Actions
                 val selectedCount = scannedPlayers.count { it.isSelected && it.matchedMemberId != null }
                 val eventName = selectedTargetEvent?.title ?: "Evenement"
+
+                // Discord Share & Copy Action Row (Works without requiring webhook or admin permissions!)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        onClick = {
+                            val msg = DiscordShareHelper.formatLeaderboardForDiscord(eventName, scannedPlayers)
+                            DiscordShareHelper.shareToDiscordOrApps(
+                                context = context,
+                                message = msg,
+                                title = "Deel uitslag naar Discord #leaders-chat"
+                            )
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF5865F2)), // Discord Blurple
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.weight(1.3f).height(44.dp).testTag("btn_share_discord_results")
+                    ) {
+                        Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            "Deel naar Discord (#leaders-chat)",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    OutlinedButton(
+                        onClick = {
+                            val msg = DiscordShareHelper.formatLeaderboardForDiscord(eventName, scannedPlayers)
+                            DiscordShareHelper.copyToClipboard(context, msg)
+                        },
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.weight(0.7f).height(44.dp).testTag("btn_copy_discord_results")
+                    ) {
+                        Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Kopieer", style = MaterialTheme.typography.labelSmall)
+                    }
+                }
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
